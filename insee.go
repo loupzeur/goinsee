@@ -18,6 +18,7 @@ var (
 	inseeTokenValidity = 604800
 )
 
+//Insee basic object to manage the API
 //https://api.gouv.fr/documentation/sirene_v3
 type Insee struct {
 	AuthKey       string
@@ -27,6 +28,7 @@ type Insee struct {
 	AuthLastToken time.Time
 }
 
+//InseeToken to manage token auth response
 type InseeToken struct {
 	Token   string `json:"access_token"`
 	Type    string `json:"token_type"`
@@ -34,17 +36,21 @@ type InseeToken struct {
 	Expires int    `json:"expires_in"`
 }
 
+//NewInsee create a non refreshed token Insee stuff
 func NewInsee(authKey string, authSecret string) Insee {
 	i := Insee{AuthKey: authKey, AuthSecret: authSecret}
 	i.SetAuthToken()
 	return i
 }
+
+//NewInseeRefreshed create a refreshed token Insee stuff
 func NewInseeRefreshed(authKey string, authSecret string) Insee {
 	i := NewInsee(authKey, authSecret)
 	i.RefreshAuthToken()
 	return i
 }
 
+//SetAuthToken will set Token from given Key and Secret
 func (i *Insee) SetAuthToken() (err error) {
 	//no need to refresh token before a while
 	if i.Authed && i.AuthLastToken.Before(i.AuthLastToken.Add(time.Second*600000)) {
@@ -77,6 +83,7 @@ func (i *Insee) SetAuthToken() (err error) {
 	return
 }
 
+//RefreshAuthToken automatically refresh the auth token based on expiry time
 func (i *Insee) RefreshAuthToken() (err error) {
 	err = i.SetAuthToken()
 	if err != nil {
@@ -91,6 +98,7 @@ func (i *Insee) RefreshAuthToken() (err error) {
 	return
 }
 
+//SirenExist return if the siren exist
 func (i *Insee) SirenExist(siren string) bool {
 	if !i.Authed || i.AuthToken.Token == "" {
 		return false
