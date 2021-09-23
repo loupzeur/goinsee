@@ -20,3 +20,9 @@ i.SirenExist("443061841")
 ```
 
 ## May provide others options from Insee database API
+
+Return the value of the call from sirene API
+```
+i := NewInsee(os.Getenv("insee_key"), os.Getenv("insee_secret"))
+i.GetSiren("443061841")
+```

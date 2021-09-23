@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/guregu/null"
 )
 
 var (
@@ -108,4 +110,125 @@ func (i *Insee) SirenExist(siren string) bool {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	return err == nil && resp.StatusCode == 200
+}
+
+//GetSiren return the API response
+func (i *Insee) GetSiren(siren string) (resp SirenBaseResponse, err error) {
+	resp = SirenBaseResponse{}
+	if !i.Authed || i.AuthToken.Token == "" {
+		return resp, errors.New("not authenticated")
+	}
+	req, _ := http.NewRequest("GET", inseeCheckUrl+siren, nil)
+	req.Header.Add("Authorization", i.AuthToken.Type+" "+i.AuthToken.Token)
+	client := &http.Client{}
+	r, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	err = json.NewDecoder(r.Body).Decode(&resp)
+	return
+}
+
+//siren get response
+
+//SirenBaseResponse structure for a Sirene API Response
+type SirenBaseResponse struct {
+	Header    SirenBaseHeader `json:"header"`
+	LegalUnit SirenLegalUnit  `json:"uniteLegale"`
+}
+
+//SirenBaseHeader Header structure for a Sirene API Response
+type SirenBaseHeader struct {
+	Status  int    `json:"statut"`
+	Message string `json:"message"`
+}
+
+//SirenLegalUnit return the values of the entitie of a siren API Call
+type SirenLegalUnit struct {
+	Siren                   string                 `json:"siren"`                             //: "443061841",
+	Status                  string                 `json:"statutDiffusionUniteLegale"`        //: "O",
+	DateCreationUniteLegale Date                   `json:"dateCreationUniteLegale"`           //: "2002-05-16",
+	Sigle                   null.String            `json:"sigleUniteLegale"`                  //: null,
+	Sexe                    null.String            `json:"sexeUniteLegale"`                   //: null,
+	Prenom1                 null.String            `json:"prenom1UniteLegale"`                //: null,
+	Prenom2                 null.String            `json:"prenom2UniteLegale"`                //: null,
+	Prenom3                 null.String            `json:"prenom3UniteLegale"`                //: null,
+	Prenom4                 null.String            `json:"prenom4UniteLegale"`                //: null,
+	Prenom                  null.String            `json:"prenomUsuelUniteLegale"`            //: null,
+	Pseudo                  null.String            `json:"pseudonymeUniteLegale"`             //: null,
+	IdentifiantAssociation  null.String            `json:"identifiantAssociationUniteLegale"` //: null,
+	TrancheEffective        null.String            `json:"trancheEffectifsUniteLegale"`       //: "41",
+	AnneeEffectifs          null.String            `json:"anneeEffectifsUniteLegale"`         //: "2018",
+	DateDernier             Date                   `json:"dateDernierTraitementUniteLegale"`  //: "2021-07-09T15:09:46",
+	NombrePeriodes          int                    `json:"nombrePeriodesUniteLegale"`         //: 10,
+	CategorieEntreprise     null.String            `json:"categorieEntreprise"`               //: "ETI",
+	AnneeCategorie          null.String            `json:"anneeCategorieEntreprise"`          //: "2018",
+	Periods                 []SirenPeriodLegalUnit `json:"periodesUniteLegale"`               //:
+}
+
+//SirenPeriodLegalUnit return each periods data from the API
+type SirenPeriodLegalUnit struct {
+	DateFin                            Date        `json:"dateFin"`                                       //: null,
+	DateDebut                          Date        `json:"dateDebut"`                                     //: "2019-01-24",
+	EtatAdministratif                  string      `json:"etatAdministratifUniteLegale"`                  //: "A",
+	ChangementEtatAdministratif        bool        `json:"changementEtatAdministratifUniteLegale"`        //: false,
+	Nom                                null.String `json:"nomUniteLegale"`                                //: null,
+	ChangementNom                      bool        `json:"changementNomUniteLegale"`                      //: false,
+	NomUsage                           null.String `json:"nomUsageUniteLegale"`                           //: null,
+	ChangementNomUsage                 bool        `json:"changementNomUsageUniteLegale"`                 //: false,
+	Denomination                       string      `json:"denominationUniteLegale"`                       //: "GOOGLE FRANCE",
+	ChangementDenomination             bool        `json:"changementDenominationUniteLegale"`             //: false,
+	DenominationUsuelle1               null.String `json:"denominationUsuelle1UniteLegale"`               //: null,
+	DenominationUsuelle2               null.String `json:"denominationUsuelle2UniteLegale"`               //: null,
+	DenominationUsuelle3               null.String `json:"denominationUsuelle3UniteLegale"`               //: null,
+	ChangementDenominationUsuelle      bool        `json:"changementDenominationUsuelleUniteLegale"`      //: false,
+	CategorieJuridique                 null.String `json:"categorieJuridiqueUniteLegale"`                 //: "5499",
+	ChangementCategorieJuridique       bool        `json:"changementCategorieJuridiqueUniteLegale"`       //: false,
+	ActivitePrincipale                 null.String `json:"activitePrincipaleUniteLegale"`                 //: "70.10Z",
+	NomenclatureActivitePrincipale     null.String `json:"nomenclatureActivitePrincipaleUniteLegale"`     //: "NAFRev2",
+	ChangementActivitePrincipale       bool        `json:"changementActivitePrincipaleUniteLegale"`       //: false,
+	NicSiege                           null.String `json:"nicSiegeUniteLegale"`                           //: "00047",
+	ChangementNicSiege                 bool        `json:"changementNicSiegeUniteLegale"`                 //: false,
+	EconomieSocialeSolidaire           null.String `json:"economieSocialeSolidaireUniteLegale"`           //: "N",
+	ChangementEconomieSocialeSolidaire bool        `json:"changementEconomieSocialeSolidaireUniteLegale"` //: true,
+	CaractereEmployeur                 null.String `json:"caractereEmployeurUniteLegale"`                 //: "O",
+	ChangementCaractereEmployeur       bool        `json:"changementCaractereEmployeurUniteLegale"`       //: false
+}
+
+//Some Date format stuff
+
+//Date return the Correct date format for the API
+type Date struct {
+	time.Time
+}
+
+const (
+	doLayout1 = "2006-01-02"
+	doLayout2 = "2006-01-02T15:04:05"
+)
+
+func (ct *Date) UnmarshalJSON(b []byte) (err error) {
+	s := strings.Trim(string(b), "\"")
+	if s == "null" {
+		ct.Time = time.Time{}
+		return
+	}
+	ct.Time, err = time.Parse(doLayout1, s)
+	if err != nil {
+		ct.Time, err = time.Parse(doLayout2, s)
+	}
+	return
+}
+
+func (ct *Date) MarshalJSON() ([]byte, error) {
+	if ct.Time.UnixNano() == nilTime {
+		return []byte("null"), nil
+	}
+	return []byte(fmt.Sprintf("\"%s\"", ct.Time.Format(doLayout2))), nil
+}
+
+var nilTime = (time.Time{}).UnixNano()
+
+func (ct *Date) IsSet() bool {
+	return ct.UnixNano() != nilTime
 }
