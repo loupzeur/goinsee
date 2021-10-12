@@ -38,3 +38,20 @@ func TestInseeResponse(t *testing.T) {
 	}
 	t.Logf("%+v", ret.LegalUnit)
 }
+
+func TestInseeMultiRequestResponse(t *testing.T) {
+	i := NewInsee(os.Getenv("insee_key"), os.Getenv("insee_secret"))
+
+	q := []string{"periode(denominationUniteLegale:Google*)"}
+
+	ret, err := i.GetSirenMultiRequest(q)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	if ret.Header.Status != 200 {
+		t.Errorf(ret.Header.Message)
+		return
+	}
+	t.Logf("%+v", ret.LegalUnit)
+}

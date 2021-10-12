@@ -129,12 +129,35 @@ func (i *Insee) GetSiren(siren string) (resp SirenBaseResponse, err error) {
 	return
 }
 
+//GetSirenMultiRequest return a request with multiple parameters
+func (i *Insee) GetSirenMultiRequest(query []string) (resp SirenBaseResponses, err error) {
+	resp = SirenBaseResponses{}
+	if !i.Authed || i.AuthToken.Token == "" {
+		return resp, errors.New("not authenticated")
+	}
+
+	req, _ := http.NewRequest("GET", inseeCheckUrl+"?q="+strings.Join(query, "&"), nil)
+	req.Header.Add("Authorization", i.AuthToken.Type+" "+i.AuthToken.Token)
+	client := &http.Client{}
+	r, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	err = json.NewDecoder(r.Body).Decode(&resp)
+	return
+}
+
 //siren get response
 
 //SirenBaseResponse structure for a Sirene API Response
 type SirenBaseResponse struct {
 	Header    SirenBaseHeader `json:"header"`
 	LegalUnit SirenLegalUnit  `json:"uniteLegale"`
+}
+
+type SirenBaseResponses struct {
+	Header    SirenBaseHeader  `json:"header"`
+	LegalUnit []SirenLegalUnit `json:"unitesLegales"`
 }
 
 //SirenBaseHeader Header structure for a Sirene API Response
