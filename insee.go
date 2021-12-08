@@ -76,11 +76,14 @@ func (i *Insee) SetAuthToken() (err error) {
 	if err == nil {
 		s, _ := ioutil.ReadAll(resp.Body)
 		ret := InseeToken{}
-		json.Unmarshal(s, &ret)
+		err = json.Unmarshal(s, &ret)
+		if err != nil {
+			return
+		}
 		//string():"{\"access_token\":\"token\",\"scope\":\"am_application_scope default\",\"token_type\":\"Bearer\",\"expires_in\":603323}"
 		i.AuthToken = ret
 		inseeTokenValidity = ret.Expires
-		i.Authed = true
+		i.Authed = i.AuthToken.Token != ""
 	}
 	return
 }
