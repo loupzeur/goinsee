@@ -39,17 +39,20 @@ type InseeToken struct {
 }
 
 //NewInsee create a non refreshed token Insee stuff
-func NewInsee(authKey string, authSecret string) Insee {
-	i := Insee{AuthKey: authKey, AuthSecret: authSecret}
-	i.SetAuthToken()
-	return i
+func NewInsee(authKey string, authSecret string) (i Insee, err error) {
+	i = Insee{AuthKey: authKey, AuthSecret: authSecret}
+	err = i.SetAuthToken()
+	return
 }
 
 //NewInseeRefreshed create a refreshed token Insee stuff
-func NewInseeRefreshed(authKey string, authSecret string) Insee {
-	i := NewInsee(authKey, authSecret)
-	i.RefreshAuthToken()
-	return i
+func NewInseeRefreshed(authKey string, authSecret string) (i Insee, err error) {
+	i, err = NewInsee(authKey, authSecret)
+	if err != nil {
+		return i, err
+	}
+	err = i.RefreshAuthToken()
+	return
 }
 
 //SetAuthToken will set Token from given Key and Secret
@@ -84,6 +87,9 @@ func (i *Insee) SetAuthToken() (err error) {
 		i.AuthToken = ret
 		inseeTokenValidity = ret.Expires
 		i.Authed = i.AuthToken.Token != ""
+		if !i.Authed {
+			return errors.New("invalid auth token or secret")
+		}
 	}
 	return
 }
