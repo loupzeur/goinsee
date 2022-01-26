@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -12,12 +13,15 @@ import (
 	"time"
 
 	"github.com/guregu/null"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
 )
 
 var (
 	inseeAuthUrl       = "https://api.insee.fr/token"
 	inseeCheckUrl      = "https://api.insee.fr/entreprises/sirene/V3/siren/"
 	inseeTokenValidity = 604800
+	Tracing            = false
 )
 
 //Insee basic object to manage the API
@@ -118,6 +122,14 @@ func (i *Insee) SirenExist(siren string) bool {
 	req.Header.Add("Authorization", i.AuthToken.Type+" "+i.AuthToken.Token)
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	if err != nil {
+		if resp != nil {
+			tmpB, _ := io.ReadAll(resp.Body)
+			ReportLogTracerError("insee", "SirenExist", siren, err.Error(), string(tmpB))
+		} else {
+			ReportLogTracerError("insee", "SirenExist", siren, err.Error())
+		}
+	}
 	return err == nil && resp.StatusCode == 200
 }
 
@@ -135,6 +147,11 @@ func (i *Insee) GetSiren(siren string) (resp SirenBaseResponse, err error) {
 		return
 	}
 	err = json.NewDecoder(r.Body).Decode(&resp)
+	if err != nil { //an error occured ... they are in pure html, no json message ...
+		tmpB, _ := io.ReadAll(r.Body)
+		err = errors.New("invalid json : " + err.Error() + " body was : " + string(tmpB))
+		ReportLogTracerError("insee", "GetSiren", siren, err.Error(), string(tmpB))
+	}
 	return
 }
 
@@ -153,6 +170,11 @@ func (i *Insee) GetSirenMultiRequest(query []string) (resp SirenBaseResponses, e
 		return
 	}
 	err = json.NewDecoder(r.Body).Decode(&resp)
+	if err != nil { //an error occured ... they are in pure html, no json message ...
+		tmpB, _ := io.ReadAll(r.Body)
+		err = errors.New("invalid json : " + err.Error() + " body was : " + string(tmpB))
+		ReportLogTracerError("insee", "GetSiren", strings.Join(query, "&"), err.Error())
+	}
 	return
 }
 
@@ -263,4 +285,17 @@ var nilTime = (time.Time{}).UnixNano()
 
 func (ct *Date) IsSet() bool {
 	return ct.UnixNano() != nilTime
+}
+
+func ReportLogTracerError(errors ...string) {
+	//trace only if allowed
+	if !Tracing || !opentracing.IsGlobalTracerRegistered() {
+		return
+	}
+	crash := opentracing.StartSpan("Reporting Insee Error")
+	defer crash.Finish()
+	for i, e := range errors {
+		crash.LogFields(log.String(fmt.Sprintf("error%d", i), e))
+	}
+	crash.SetTag("error", true)
 }
