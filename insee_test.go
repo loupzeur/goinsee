@@ -3,6 +3,7 @@ package goinsee
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 func TestInseeAuth(t *testing.T) {
@@ -86,4 +87,19 @@ func TestRetryFailedAuth(t *testing.T) {
 		return
 	}
 	t.Errorf("should fail")
+}
+
+func TestRefreshTimer(t *testing.T) {
+	date1 := time.Now()
+	date2 := time.Now().Add(time.Duration(time.Hour * -1))
+
+	if date1.Before(date2) {
+		t.Errorf("date1 should be after date2")
+		return
+	}
+
+	t.Logf("%+v\n%+v\n%+v\n", time.Duration(inseeTokenValidity/14)*time.Second, date1, date2)
+
+	comp1 := time.Now().Add(time.Duration(inseeTokenValidity) * time.Second)
+	t.Logf("%+v\n%+v\n%+v\n", !comp1.Before(time.Now()), comp1, time.Now())
 }

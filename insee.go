@@ -68,7 +68,10 @@ func NewInseeRefreshed(authKey string, authSecret string) (i Insee, err error) {
 //SetAuthToken will set Token from given Key and Secret
 func (i *Insee) SetAuthToken() (err error) {
 	//no need to refresh token before a while
-	if i.Authed && i.AuthLastToken.Before(i.AuthLastToken.Add(time.Second*600000)) {
+	//only refresh 12 hours before expiration
+	if i.Authed && !i.AuthLastToken.
+		Add(time.Duration(inseeTokenValidity)*time.Second).
+		Before(time.Now().Add(time.Hour*12)) {
 		return
 	}
 	if i.AuthKey == "" || i.AuthSecret == "" {
@@ -125,9 +128,14 @@ RETRY:
 		return
 	}
 	go func() {
-		//refreshing every 7 days approximately
-		td := time.Duration(inseeTokenValidity - 600)
-		time.Sleep(time.Second * td)
+		//by default sirene reply with a token valid for 7 days
+		//refreshing every day approximately
+		td := time.Duration(inseeTokenValidity/14) * time.Second
+		if inseeTokenValidity < 600000 {
+			//sleep only One day if less than a week
+			td = time.Hour * 12
+		}
+		time.Sleep(td)
 		i.RefreshAuthToken()
 	}()
 	return
