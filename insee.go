@@ -142,6 +142,12 @@ func (i *Insee) SirenExist(siren string) bool {
 	req.Header.Add("Authorization", i.AuthToken.Type+" "+i.AuthToken.Token)
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	if resp.StatusCode != 200 {
+		tmpB, _ := io.ReadAll(resp.Body)
+		err = errors.New("server status : " + resp.Status + " body was : " + string(tmpB))
+		ReportLogTracerError("insee", "SirenExist", siren, err.Error(), string(tmpB))
+		return false
+	}
 	if err != nil {
 		if resp != nil {
 			tmpB, _ := io.ReadAll(resp.Body)
@@ -164,6 +170,13 @@ func (i *Insee) GetSiren(siren string) (resp SirenBaseResponse, err error) {
 	client := &http.Client{}
 	r, err := client.Do(req)
 	if err != nil {
+		ReportLogTracerError("insee", "GetSiren", siren, err.Error())
+		return
+	}
+	if r.StatusCode != 200 {
+		tmpB, _ := io.ReadAll(r.Body)
+		err = errors.New("server status : " + r.Status + " body was : " + string(tmpB))
+		ReportLogTracerError("insee", "GetSiren", siren, string(tmpB))
 		return
 	}
 	err = json.NewDecoder(r.Body).Decode(&resp)
@@ -187,13 +200,20 @@ func (i *Insee) GetSirenMultiRequest(query []string) (resp SirenBaseResponses, e
 	client := &http.Client{}
 	r, err := client.Do(req)
 	if err != nil {
+		ReportLogTracerError("insee", "GetSirenMultiRequest", strings.Join(query, "&"), err.Error())
+		return
+	}
+	if r.StatusCode != 200 {
+		tmpB, _ := io.ReadAll(r.Body)
+		err = errors.New("server status : " + r.Status + " body was : " + string(tmpB))
+		ReportLogTracerError("insee", "GetSirenMultiRequest", strings.Join(query, "&"), string(tmpB))
 		return
 	}
 	err = json.NewDecoder(r.Body).Decode(&resp)
 	if err != nil { //an error occured ... they are in pure html, no json message ...
 		tmpB, _ := io.ReadAll(r.Body)
 		err = errors.New("invalid json : " + err.Error() + " body was : " + string(tmpB))
-		ReportLogTracerError("insee", "GetSiren", strings.Join(query, "&"), err.Error())
+		ReportLogTracerError("insee", "GetSirenMultiRequest", strings.Join(query, "&"), err.Error())
 	}
 	return
 }
