@@ -68,21 +68,22 @@ func TestInseeMultiRequestResponse(t *testing.T) {
 }
 
 func TestNoKey(t *testing.T) {
-	i, err := NewInsee(os.Getenv("insee_key"), os.Getenv("insee_secret")[:10])
+	_, err := NewInsee(os.Getenv("insee_key"), os.Getenv("insee_secret")[:10])
+	//should fail ...
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Logf(err.Error())
 		return
 	}
-	q := []string{"periode(denominationUniteLegale:Google*)"}
-
-	ret, err := i.GetSirenMultiRequest(q)
+	t.Errorf("should fail")
+}
+func TestRetryFailedAuth(t *testing.T) {
+	Tracing = true
+	RetryAuth = 10
+	_, err := NewInseeRefreshed(os.Getenv("insee_key"), os.Getenv("insee_secret")[:10])
+	//should fail ...
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Logf(err.Error())
 		return
 	}
-	if ret.Header.Status != 200 {
-		t.Errorf(ret.Header.Message)
-		return
-	}
-	t.Logf("%+v", ret.LegalUnit)
+	t.Errorf("should fail")
 }

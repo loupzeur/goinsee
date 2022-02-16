@@ -21,6 +21,7 @@ var (
 	inseeAuthUrl       = "https://api.insee.fr/token"
 	inseeCheckUrl      = "https://api.insee.fr/entreprises/sirene/V3/siren/"
 	inseeTokenValidity = 604800
+	RetryAuth          = 60
 	Tracing            = false
 )
 
@@ -55,7 +56,12 @@ func NewInseeRefreshed(authKey string, authSecret string) (i Insee, err error) {
 	if err != nil {
 		return i, err
 	}
-	err = i.RefreshAuthToken()
+	go func() {
+		//since we've already called SetAuth in NewInsee, in case of error,
+		//avoid calling it again instantly after ...
+		time.Sleep(time.Second * time.Duration(RetryAuth))
+		err = i.RefreshAuthToken()
+	}()
 	return
 }
 
@@ -66,7 +72,7 @@ func (i *Insee) SetAuthToken() (err error) {
 		return
 	}
 	if i.AuthKey == "" || i.AuthSecret == "" {
-		return errors.New("invalid auth token or secret")
+		return errors.New("invalid auth key or secret")
 	}
 	msg := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", i.AuthKey, i.AuthSecret)))
 
@@ -80,19 +86,25 @@ func (i *Insee) SetAuthToken() (err error) {
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	if resp.StatusCode != 200 {
+		ReportLogTracerError("insee", "SetAuthToken", "Auth failed")
+		return errors.New("Server answered : " + resp.Status)
+	}
+
 	if err == nil {
 		s, _ := ioutil.ReadAll(resp.Body)
 		ret := InseeToken{}
 		err = json.Unmarshal(s, &ret)
 		if err != nil {
+			ReportLogTracerError("insee", "SetAuthToken", "JSON decoding problem", err.Error(), string(s))
 			return
 		}
-		//string():"{\"access_token\":\"token\",\"scope\":\"am_application_scope default\",\"token_type\":\"Bearer\",\"expires_in\":603323}"
 		i.AuthToken = ret
 		inseeTokenValidity = ret.Expires
 		i.Authed = i.AuthToken.Token != ""
 		if !i.Authed {
-			return errors.New("invalid auth token or secret")
+			ReportLogTracerError("insee", "SetAuthToken", "Auth token is empty", string(s))
+			return errors.New("returned token is empty")
 		}
 	}
 	return
@@ -100,13 +112,21 @@ func (i *Insee) SetAuthToken() (err error) {
 
 //RefreshAuthToken automatically refresh the auth token based on expiry time
 func (i *Insee) RefreshAuthToken() (err error) {
+	nbRetry := 0
+RETRY:
 	err = i.SetAuthToken()
 	if err != nil {
+		ReportLogTracerError("insee", "RefreshAuthToken", "SetAuthToken failed", err.Error())
+		if nbRetry < 2 {
+			nbRetry++
+			time.Sleep(time.Second * time.Duration(RetryAuth)) //wait 1 minute before retry
+			goto RETRY
+		}
 		return
 	}
 	go func() {
 		//refreshing every 7 days approximately
-		td := time.Duration(inseeTokenValidity - 60)
+		td := time.Duration(inseeTokenValidity - 600)
 		time.Sleep(time.Second * td)
 		i.RefreshAuthToken()
 	}()
