@@ -89,26 +89,31 @@ func (i *Insee) SetAuthToken() (err error) {
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	if err != nil {
+		ReportLogTracerError("insee", "SetAuthToken", "Auth failed", err.Error())
+		return err
+	}
+	if resp == nil {
+		ReportLogTracerError("insee", "SetAuthToken", "Auth failed, resp is null")
+		return errors.New("Server answered : " + resp.Status)
+	}
 	if resp.StatusCode != 200 {
 		ReportLogTracerError("insee", "SetAuthToken", "Auth failed")
 		return errors.New("Server answered : " + resp.Status)
 	}
-
-	if err == nil {
-		s, _ := ioutil.ReadAll(resp.Body)
-		ret := InseeToken{}
-		err = json.Unmarshal(s, &ret)
-		if err != nil {
-			ReportLogTracerError("insee", "SetAuthToken", "JSON decoding problem", err.Error(), string(s))
-			return
-		}
-		i.AuthToken = ret
-		inseeTokenValidity = ret.Expires
-		i.Authed = i.AuthToken.Token != ""
-		if !i.Authed {
-			ReportLogTracerError("insee", "SetAuthToken", "Auth token is empty", string(s))
-			return errors.New("returned token is empty")
-		}
+	s, _ := ioutil.ReadAll(resp.Body)
+	ret := InseeToken{}
+	err = json.Unmarshal(s, &ret)
+	if err != nil {
+		ReportLogTracerError("insee", "SetAuthToken", "JSON decoding problem", err.Error(), string(s))
+		return
+	}
+	i.AuthToken = ret
+	inseeTokenValidity = ret.Expires
+	i.Authed = i.AuthToken.Token != ""
+	if !i.Authed {
+		ReportLogTracerError("insee", "SetAuthToken", "Auth token is empty", string(s))
+		return errors.New("returned token is empty")
 	}
 	return
 }
